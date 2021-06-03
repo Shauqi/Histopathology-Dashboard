@@ -1,0 +1,1291 @@
+<!DOCTYPE html>
+	<meta charset="utf-8">
+	<script src="https://d3js.org/d3.v4.min.js"></script>
+	<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+	<style>
+	
+	body {
+  		background: black;
+	}
+
+	#Top_Panel {
+  		display: flex;
+        /*background-color: gray;*/
+        height: 35%;
+        width: 95%;
+        padding-left: 2%;
+        padding-top: 0.5%;
+        padding-bottom: 0.3%;
+        gap: 0.3%;
+		}
+
+	#title {
+		border:1px solid #303030;
+		background-color: #303030;
+		height: 4%;
+		text-align: center;
+		color: white;
+		align-items: center;
+	}
+
+    #Bottom_Panel {
+        display: flex;
+        /*background-color: gray;*/
+        height: 35%;
+        width: 95%;
+        padding-left: 2%;
+        gap: 0.3%;
+    }
+    .highlight {
+        fill: steelblue;
+    }
+
+    #tsne_ground {
+      border:1px solid #303030;
+      width: 26%;
+      height: 90%;
+      background-color: #202020;
+    }
+    .axisWhite line{
+      stroke: white;
+    }
+
+    .axisWhite path{
+      stroke: white;
+    }
+
+    .axisWhite text{
+      fill: white;
+    }
+
+    #tsne_predict {
+      border:1px solid #303030;
+      width: 26%;
+      height: 90%;
+      background-color: #202020;
+    }
+
+    #layer_images {
+      border:1px solid #303030;
+      width: 27%;
+      height: 90%;
+      background-color: #202020;
+    }
+
+    #mds_plot {
+      border:1px solid #303030;
+      width: 21%;
+      height: 90%;
+      background-color: #202020;
+    }
+
+    #summary_tab
+    {
+      border:1px solid #303030;
+      width: 25%;
+      height: 90%;
+      background-color: #202020;
+      padding-bottom: 1.6%;
+    }
+
+    #NN_Vis
+    {
+      border:1px solid #303030;
+      width: 30%;
+      height: 90%;
+      background-color: #202020;
+    }
+
+    #pcp
+    {
+      border:1px solid #303030;
+      width: 45%;
+      height: 90%;
+      background-color: #202020;    
+    }
+
+    #stat_info {
+		border:2px solid #202020;
+		background-color: rgb(73, 73, 73);
+		padding: 1%;
+		text-align: center;
+		color: white;
+		align-items: center;
+	}
+
+  #summary_tab {
+   float:left; 
+}
+  #sum_tab{
+   float:left; 
+   clear: left;
+}
+
+    tr:nth-of-type(odd) {
+      background: #333;
+    }
+    th {
+      background: #333;
+      color: white;
+      font-weight: bold;
+      background-repeat: no-repeat;
+    }
+    td,
+    th {
+      padding: 5px;
+      border: 1px solid #ccc;
+      text-align: center;
+    }
+	</style>
+	<head>
+	</head>
+	<body>
+	
+		<div id='Top_Panel'>
+			<div id='tsne_ground'>
+				<div id="title">TSNE PLOT (GROUND TRUTH)</div>
+			</div>
+			<div id='tsne_predict'>
+				<div id="title">TSNE PLOT (PREDICT)</div>
+			</div>
+			<div id='mds_plot'>
+				<div id="title">MDS PLOT</div>
+			</div>
+			<div id='layer_images'>
+				<div id="title">CORRESPONDING IMAGE</div>
+			</div>
+		</div>
+
+    <div id='Bottom_Panel'>
+    	<div id="pcp">
+    		<div id="title">PARALLEL COORDINATE PLOT</div>
+    	</div>
+        
+          <div id="summary_tab">
+            <div id="title">SUMMARY STATISTICS</div>
+            <div id="stat_info">Patient ID : 1</div>
+            <div id="stat_info">Cohort : TCGA</div>
+            <div id="stat_info">Organ Type: Colon</div>
+            <div id="stat_info">Magnificantion: 40x</div>
+            <div id="stat_info">Microns Per Pixel: 0.25</div>
+            <div id="sum_tab"></div>
+          </div>
+      	
+      	<div id="NN_Vis">
+      		<div id="title">NEURAL NETWORK PATCH VISUALIZER</div>
+      	</div>
+        
+    </div>
+		<script>
+
+    var patch_num = 0;
+		var color = d3.scaleOrdinal(d3.schemeCategory10);
+   // var color = d3.scaleOrdinal(d3.schemePaired);
+		var send_index = [];
+    var data_tsne
+    var data_tsne_predict
+    var data_pcp
+    var data_mds
+    var data_summary
+    var tsne_select_index = [];
+    var mds_index
+    var count_t = 1
+    var id_c
+    var id_old
+    var mds_send_index = []
+    var pcp_send_index = []
+    var br = false
+    var brush_test = false
+    var summary_index = []
+
+
+    file_name = "static/Data/0_0.png";
+    var margin = {top: 30, right: 0, bottom: 0, left: 50},
+    width = 450 - margin.left - margin.right,
+    height = 380 - margin.top - margin.bottom;
+    d3.select("#layer_images").select("svg").remove();
+    var svg_layer = d3.select("#layer_images").append("svg")
+    .attr("width", width + margin.left + margin.right)
+      .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+      .attr("transform","translate(" + margin.left + "," + margin.top + ")");
+
+      var myimage = svg_layer.append('image')
+      .attr('xlink:href', file_name)
+      .attr('width',"400")
+      .attr('height',"320");
+
+    file_name_1 = "static/conv1/0_0.png";
+    file_name_2 = "static/layer1/0_0.png";
+    file_name_3 = "static/layer2/0_0.png";
+    file_name_4 = "static/layer3/0_0.png";
+    file_name_5 = "static/layer4/0_0.png";
+    file_name_aug = "static/Augmented/0_0.png";
+    nn_label = "static/NN_LABEL_2.png";
+    var margin = {top: 10, right: 0, bottom: 0, left: 50},
+    width = 600 - margin.left - margin.right,
+    height = 480 - margin.top - margin.bottom;
+    d3.select("#NN_Vis").select("svg").remove();
+    var svg_nn = d3.select("#NN_Vis").append("svg")
+    .attr("width", width + margin.left + margin.right)
+    .attr("height", height + margin.top + margin.bottom)
+    .append("g")
+    .attr("transform","translate(" + margin.left + "," + margin.top + ")");
+
+    var myimageaug = svg_nn.append('image')
+    .attr('xlink:href', file_name_aug)
+    .attr("y",70)
+    .attr("x",-20);
+
+    var myimage1 = svg_nn.append('image')
+    .attr('xlink:href', file_name_1)
+    .attr("y",120)
+    .attr("x",230);
+
+    var myimage2 = svg_nn.append('image')
+    .attr('xlink:href', file_name_2)
+    .attr("y",140)
+    .attr("x",355);
+
+    var myimage3 = svg_nn.append('image')
+    .attr('xlink:href', file_name_3)
+    .attr("y",150)
+    .attr("x",420);
+
+    var myimage4 = svg_nn.append('image')
+    .attr('xlink:href', file_name_4)
+    .attr("y",155)
+    .attr("x",455);
+
+    var myimage5 = svg_nn.append('image')
+    .attr('xlink:href', file_name_5)
+    .attr("y",158)
+    .attr("x",473);
+
+    var nn_label_img = svg_nn.append('image')
+    .attr('xlink:href', nn_label)
+    .attr('width',"500")
+    .attr("y",330)
+    .attr("x",-30);
+
+
+    //-----------------------Event Listener to Reset-------------------------------
+      document.getElementById('tsne_ground').addEventListener('click', function getDetails(evt) {
+            id_c = this.getAttribute('id');
+            if (id_c!=id_old){
+              reset_all()
+            }
+            evt.stopPropagation();
+          });
+      document.getElementById('tsne_predict').addEventListener('click', function getDetails(evt) {
+            id_c = this.getAttribute('id');
+            if (id_c!=id_old){
+              reset_all()
+            }
+            evt.stopPropagation();
+          });
+      document.getElementById('pcp').addEventListener('click', function getDetails(evt) {
+            id_c = this.getAttribute('id');
+            if (id_c!=id_old){
+              reset_all()
+            }
+            evt.stopPropagation();
+          });
+      document.getElementById('layer_images').addEventListener('click', function getDetails(evt) {
+            id_c = this.getAttribute('id');
+            if (id_c!=id_old){
+              reset_all()
+            }
+            evt.stopPropagation();
+          });
+      document.getElementById('NN_Vis').addEventListener('click', function getDetails(evt) {
+            id_c = this.getAttribute('id');
+            if (id_c!=id_old){
+              reset_all()
+            }
+            evt.stopPropagation();
+          });
+
+      function reset_all(){
+        br = false
+        send_index = [] 
+        tsne_select_index = []
+        mds_send_index = []
+        pcp_send_index = []
+        summary_index = []
+        count_t = 1
+        mds_index = -1
+        d3.select("#tsne_ground").selectAll("svg").remove();
+        plot_tsne_ground(data_tsne, send_index, tsne_select_index,mds_send_index)
+        d3.select("#tsne_predict").selectAll("svg").remove();
+        plot_tsne_predict(data_tsne_predict, send_index, tsne_select_index,mds_send_index)
+        d3.select("#pcp").selectAll("svg").remove();
+        plot_pcp(data_pcp, pcp_send_index)
+        d3.select("#mds_plot").selectAll("svg").remove();
+        plot_mds(data_mds, mds_index)
+        d3.select("#sum_tab").selectAll("*").remove();
+        plot_summary(data_summary, summary_index)
+      }
+
+
+    function colorReturn(c_r){
+      if (c_r==0) {
+        return '#D81B60'
+      }else if (c_r == 1){
+        return '#1E88E5'
+      }else if (c_r == 2){
+        return '#FFC107'
+      }else if (c_r == 3){
+        return '#3CEEA9'
+      }else if (c_r == 4){
+        return '#7A06CB'
+      }
+    }
+
+
+//---------------------------------tsne ground Plot--------------------------------------
+
+    d3.json("/tsne_ground", function(error, data){
+      data_tsne = data
+      plot_tsne_ground(data_tsne, send_index, tsne_select_index,mds_send_index)
+	  });
+		//function for ground tsne plot
+    function plot_tsne_ground(data, send_index,  tsne_select_index, mds_send_index){
+      var new_index =[]
+      var pcp_TF = false
+      if (send_index!=null){
+        if (send_index.length>0){
+        pcp_TF = true;}
+        for (i in send_index){
+          new_index.push(send_index[i])
+          new_index.push(send_index[i]+156)
+          new_index.push(send_index[i]+2*156)
+          new_index.push(send_index[i]+3*156)
+          new_index.push(send_index[i]+4*156)
+        } 
+      }
+      if (mds_send_index.length>0){
+        new_index = mds_send_index
+        pcp_TF = true;
+      }
+			var margin = {top: 10, right: 100, bottom: 50, left: 50},
+    		width = 450 - margin.left - margin.right,
+    		height = 380 - margin.top - margin.bottom;
+			var svg_tsne_ground = d3.select("#tsne_ground").append("svg")
+				.attr("width", width + margin.left + margin.right)
+    			.attr("height", height + margin.top + margin.bottom)
+          .call(d3.zoom().on("zoom", function () {//zoom work
+              svg_tsne_ground.attr("transform", d3.event.transform)
+      }))  		
+  				.append("g")
+    			.attr("transform","translate(" + margin.left + "," + margin.top + ")");
+    		var x = d3.scaleLinear()
+    		.domain([d3.min(data['data'], function(d) { return +d[2] }), d3.max(data['data'], function(d) { return +d[2] })])
+    		.range([ 0, width ]);
+
+    		svg_tsne_ground.append("g")
+        .attr("class", "axisWhite")
+    		.attr("transform", "translate(0," + height + ")")
+    		.call(d3.axisBottom(x));
+  			var y = d3.scaleLinear()
+    		.domain([d3.min(data['data'], function(d) { return +d[3] }), d3.max(data['data'], function(d) { return +d[3] })])
+    		.range([ height, 0]);
+
+    		svg_tsne_ground.append("g")
+        .attr("class", "axisWhite")
+    		.call(d3.axisLeft(y))
+    		.append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("y", height-350)
+            .attr("x", width-450)
+            .attr("font-size", "12px")
+            .style("fill", "white")
+            .style("font-family", "Arial")
+            .text("Dim 2");
+
+    		svg_tsne_ground.append('g')
+    		.selectAll("dot")
+    		.data(data['data'])
+    		.enter()
+    		.append("circle")
+      		.attr("cx", function (d) { return x(d[2]); } )
+      		.attr("cy", function (d) { return y(d[3]); } )
+      		.attr("r", 2)
+          
+          //based on pcp brushing/clicking circle color will change here
+      		.style("fill", function(d) {
+            if (pcp_TF == true){
+              kx = new_index.includes(d[0]);
+              if(kx){
+                return "white"
+              }else{
+                c_return = colorReturn(d[1])
+                return c_return
+                //return color(d[1]);
+              }
+            }else if (pcp_TF == false){
+              kxx = tsne_select_index.includes(d[0]);
+              if(kxx){
+                return "white"
+              }else{
+                c_return = colorReturn(d[1])
+                return c_return;}
+                //return color(d[1]);}
+            }
+           })
+          //opacitity changing based on brushing/clicking
+          .style("opacity", function(d) {
+            if (pcp_TF == true){
+              kx = new_index.includes(d[0]);
+              if(kx){
+                return 1
+              }else{
+                return 0.4;}
+            }else if (pcp_TF == false){       
+              if (tsne_select_index.length == 0 && count_t == 1){
+                return 1
+              }else{         
+                kxx = tsne_select_index.includes(d[0]);
+                if(kxx){
+                  tsne_select_index=[]
+                  return 1
+                }else{
+                  return 0.4;
+                }
+            }
+          }
+           })
+          .on("mouseover", onMouseOver_tgrnd)
+          .on("mouseout", onMouseOut_tgrnd)
+      		.on("click", onClick);
+
+          function onMouseOver_tgrnd(){
+            d3.select(this)
+            .transition()
+            .duration(0)
+            .attr("r", 10);
+          }
+          function onMouseOut_tgrnd(){
+            d3.select(this).attr("r", 2);
+          }
+
+		
+			var num_cluster = 5;
+			var label = ["Epithelium","Stroma","Tumor","Necrosis","Dysplasia"]
+
+			for(var i=0; i<num_cluster; i++)
+  			{
+          c_return = colorReturn(i)
+  				svg_tsne_ground.append("circle").attr("cx",width+20).attr("cy",20+(i*30)).attr("r", 3).style("fill", c_return);
+  				svg_tsne_ground.append("text").attr("x",width+30).attr("y", 20+(i*30)).text(label[i]).style("font-size", "15px").style("fill", "white").attr("alignment-baseline","middle");
+  			}
+
+	   		svg_tsne_ground.append("text")
+            .attr("y", height + 35)
+            .attr("x", width - 150)
+            .attr("font-size", "12px")
+            .style("font-family", "Arial")
+            .style("fill", "white")
+            .text('Dim 1');
+
+            //function for onclick interaction
+            function onClick(d, i)
+            {
+              br = true
+              brush_test = false;
+              id_old = 'tsne_ground'
+              count_t = count_t+1
+              send_index = [];
+              mds_send_index = [];
+              pcp_send_index = []
+              mds_index = d[1]
+                tsne_select_index.push(i)
+                pcp_send_index.push(i%156)
+
+                d3.select("#tsne_ground").selectAll("svg").remove();
+                plot_tsne_ground(data_tsne, send_index, tsne_select_index,mds_send_index)
+                d3.select("#tsne_predict").selectAll("svg").remove();
+                plot_tsne_predict(data_tsne_predict, send_index, tsne_select_index, mds_send_index)
+                d3.select("#pcp").selectAll("svg").remove();
+                plot_pcp(data_pcp, pcp_send_index)
+                d3.select("#mds_plot").selectAll("svg").remove();
+                plot_mds(data_mds, mds_index)
+                br = false
+
+              	file_name = "static/Data/"+d[0]+'_'+d[1]+'.png';
+                patch_num = d[0];
+              	var margin = {top: 30, right: 50, bottom: 0, left: 50},
+      			    width = 450 - margin.left - margin.right,
+      			    height = 380 - margin.top - margin.bottom;
+				        d3.select("#layer_images").select("svg").remove();
+        				var svg_layer = d3.select("#layer_images").append("svg")
+        				.attr("width", width + margin.left + margin.right)
+            			.attr("height", height + margin.top + margin.bottom)
+          				.append("g")
+            			.attr("transform","translate(" + margin.left + "," + margin.top + ")");
+
+
+            			var myimage = svg_layer.append('image')
+            			.attr('xlink:href', file_name)
+                  .attr('width',"400")
+                  .attr('height',"320");
+
+
+                file_name_1 = "static/conv1/"+d[0]+'_'+d[1]+'.png';
+                file_name_2 = "static/layer1/"+d[0]+'_'+d[1]+'.png';
+                file_name_3 = "static/layer2/"+d[0]+'_'+d[1]+'.png';
+                file_name_4 = "static/layer3/"+d[0]+'_'+d[1]+'.png';
+                file_name_5 = "static/layer4/"+d[0]+'_'+d[1]+'.png';
+                file_name_aug = "static/Augmented/"+d[0]+'_'+d[1]+'.png';
+                nn_label = "static/NN_LABEL_2.png";
+                patch_num = d[0];
+                var margin = {top: 10, right: 0, bottom: 0, left: 50},
+                width = 600 - margin.left - margin.right,
+                height = 480 - margin.top - margin.bottom;
+                d3.select("#NN_Vis").select("svg").remove();
+                var svg_nn = d3.select("#NN_Vis").append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform","translate(" + margin.left + "," + margin.top + ")");
+
+			    var myimageaug = svg_nn.append('image')
+			    .attr('xlink:href', file_name_aug)
+			    .attr("y",70)
+			    .attr("x",-20);
+
+			    var myimage1 = svg_nn.append('image')
+			    .attr('xlink:href', file_name_1)
+			    .attr("y",120)
+			    .attr("x",230);
+
+			    var myimage2 = svg_nn.append('image')
+			    .attr('xlink:href', file_name_2)
+			    .attr("y",140)
+			    .attr("x",355);
+
+			    var myimage3 = svg_nn.append('image')
+			    .attr('xlink:href', file_name_3)
+			    .attr("y",150)
+			    .attr("x",420);
+
+                var myimage4 = svg_nn.append('image')
+                .attr('xlink:href', file_name_4)
+                .attr("y",155)
+                .attr("x",455);
+
+                var myimage5 = svg_nn.append('image')
+                .attr('xlink:href', file_name_5)
+                .attr("y",158)
+                .attr("x",473);
+
+				var nn_label_img = svg_nn.append('image')
+		    	.attr('xlink:href', nn_label)
+		    	.attr('width',"500")
+		    	.attr("y",330)
+		    	.attr("x",-30);
+
+			}
+
+		};
+
+    //---------------------------tsne predict plot--------------------------------------------
+    d3.json("/tsne_predict", function(error, data){
+      data_tsne_predict = data
+      plot_tsne_predict(data_tsne_predict, send_index, tsne_select_index, mds_send_index)
+	  });
+    //function to plot predicted tsne figure
+    function plot_tsne_predict(data, send_index, tsne_select_index, mds_send_index){
+      var new_index =[]
+      var pcp_TF = false
+      if (send_index!=null){
+        if (send_index.length>0){
+        pcp_TF = true;}
+        for (i in send_index){
+          new_index.push(send_index[i])
+          new_index.push(send_index[i]+156)
+          new_index.push(send_index[i]+2*156)
+          new_index.push(send_index[i]+3*156)
+          new_index.push(send_index[i]+4*156)
+        } 
+      }
+      if (mds_send_index.length>0){
+        new_index = mds_send_index
+        pcp_TF = true;
+      }
+			var margin = {top: 10, right: 100, bottom: 50, left: 50},
+    		width = 450 - margin.left - margin.right,
+    		height = 380 - margin.top - margin.bottom;
+
+			var svg_tsne_predict = d3.select("#tsne_predict").append("svg")
+				.attr("width", width + margin.left + margin.right)
+    			.attr("height", height + margin.top + margin.bottom)
+          .call(d3.zoom().on("zoom", function () {//zoom work
+              svg_tsne_predict.attr("transform", d3.event.transform)
+      }))  		
+  				.append("g")
+    			.attr("transform","translate(" + margin.left + "," + margin.top + ")");
+
+    		var x = d3.scaleLinear()
+    		.domain([d3.min(data['data'], function(d) { return +d[2] }), d3.max(data['data'], function(d) { return +d[2] })])
+    		.range([ 0, width ]);
+
+    		svg_tsne_predict.append("g")
+        .attr("class", "axisWhite")
+    		.attr("transform", "translate(0," + height + ")")
+    		.call(d3.axisBottom(x));
+
+  			var y = d3.scaleLinear()
+    		.domain([d3.min(data['data'], function(d) { return +d[3] }), d3.max(data['data'], function(d) { return +d[3] })])
+    		.range([ height, 0]);
+
+    		svg_tsne_predict.append("g")
+        .attr("class", "axisWhite")
+    		.call(d3.axisLeft(y))
+    		.append("text")
+            .attr("transform", "rotate(-90)")
+			.attr("y", height-350)
+            .attr("x", width-450)
+            .attr("font-size", "12px")
+            .style("fill", "white")
+            .style("font-family", "Arial")
+            .text("Dim 2");
+
+    		svg_tsne_predict.append('g')
+    		.selectAll("dot")
+    		.data(data['data'])
+    		.enter()
+    		.append("circle")
+      		.attr("cx", function (d) { return x(d[2]); } )
+      		.attr("cy", function (d) { return y(d[3]); } )
+      		.attr("r", 2)
+      		.style("fill", function(d) {
+            if (pcp_TF == true){
+              kx = new_index.includes(d[0]);
+              if(kx){
+                return "white"
+              }else{
+                c_return = colorReturn(d[1])
+                return c_return;
+               // return color(d[1]);
+              }
+            }else if (pcp_TF == false){
+              kxx = tsne_select_index.includes(d[0]);
+              if(kxx){
+                return "white"
+              }else{
+                c_return = colorReturn(d[1])
+                return c_return;
+               // return color(d[1]);
+              }
+            }
+           })
+            //changing opacity based on brushing
+            .style("opacity", function(d) {
+            if (pcp_TF == true){
+              kx = new_index.includes(d[0]);
+              if(kx){
+                return 1
+              }else{
+                return 0.4;}
+            }else if (pcp_TF == false){
+              if (tsne_select_index.length == 0 && count_t == 1){
+                return 1
+              }else{
+                kxx = tsne_select_index.includes(d[0]);
+                if(kxx){
+                  tsne_select_index=[]
+                  return 1
+                }else{
+                  return 0.4;
+                }
+            }
+          }
+           })
+
+          .on("mouseover", onMouseOver_tgrnd)
+          .on("mouseout", onMouseOut_tgrnd)
+      		.on("click", onClick);
+
+          function onMouseOver_tgrnd(){
+            d3.select(this)
+            .transition()
+            .duration(0)
+            .attr("r", 10);
+          }
+          function onMouseOut_tgrnd(){
+            d3.select(this).attr("r", 2);
+          }
+		
+			var num_cluster = 5;
+			var label = ["Epithelium","Stroma","Tumor","Necrosis","Dysplasia"]
+
+			for(var i=0; i<num_cluster; i++)
+  			{
+          c_return = colorReturn(i)
+  				svg_tsne_predict.append("circle").attr("cx",width+20).attr("cy",20+(i*30)).attr("r", 3).style("fill", c_return);
+  				svg_tsne_predict.append("text").attr("x",width+30).attr("y", 20+(i*30)).text(label[i]).style("font-size", "15px").style("fill", "white").attr("alignment-baseline","middle");
+  			}
+
+	   		svg_tsne_predict.append("text")
+            .attr("y", height + 35)
+            .attr("x", width - 150)
+            .attr("font-size", "12px")
+            .style("font-family", "Arial")
+            .style("fill", "white")
+            .text('Dim 1');
+
+
+            function onClick(d, i)
+            {
+              br = true
+              brush_test = false;
+              id_old = 'tsne_predict'
+              count_t = count_t+1
+              send_index = [];
+              mds_send_index = []
+              pcp_send_index = []
+              mds_index = d[1]
+              tsne_select_index.push(i)
+              pcp_send_index.push(i%156)
+              d3.select("#tsne_ground").selectAll("svg").remove();
+              plot_tsne_ground(data_tsne, send_index, tsne_select_index,mds_send_index)
+              d3.select("#tsne_predict").selectAll("svg").remove();
+              plot_tsne_predict(data_tsne_predict, send_index, tsne_select_index, mds_send_index)
+              d3.select("#pcp").selectAll("svg").remove();
+              plot_pcp(data_pcp, pcp_send_index)
+              d3.select("#mds_plot").selectAll("svg").remove();
+              plot_mds(data_mds, mds_index)
+
+                //----------------static image handling------------------------
+              	file_name = "static/Data/"+d[0]+'_'+d[4]+'.png';
+                patch_num = d[0];
+              	var margin = {top: 30, right: 50, bottom: 50, left: 50},
+          			width = 450 - margin.left - margin.right,
+          			height = 380 - margin.top - margin.bottom;
+      				  d3.select("#layer_images").select("svg").remove();
+      				  var svg_layer = d3.select("#layer_images").append("svg")
+      				  .attr("width", width + margin.left + margin.right)
+          			.attr("height", height + margin.top + margin.bottom)
+        				.append("g")
+          			.attr("transform","translate(" + margin.left + "," + margin.top + ")");
+
+          			var myimage = svg_layer.append('image')
+          			.attr('xlink:href', file_name)
+                .attr('width',"400")
+                .attr('height',"320");
+
+
+                file_name_1 = "static/conv1/"+d[0]+'_'+d[4]+'.png';
+                file_name_2 = "static/layer1/"+d[0]+'_'+d[4]+'.png';
+                file_name_3 = "static/layer2/"+d[0]+'_'+d[4]+'.png';
+                file_name_4 = "static/layer3/"+d[0]+'_'+d[4]+'.png';
+                file_name_5 = "static/layer4/"+d[0]+'_'+d[4]+'.png';
+                file_name_aug = "static/Augmented/"+d[0]+'_'+d[4]+'.png';
+                nn_label = "static/NN_LABEL_2.png";
+                patch_num = d[0];
+                var margin = {top: 10, right: 0, bottom: 0, left: 50},
+                width = 600 - margin.left - margin.right,
+                height = 480 - margin.top - margin.bottom;
+                d3.select("#NN_Vis").select("svg").remove();
+                var svg_nn = d3.select("#NN_Vis").append("svg")
+                .attr("width", width + margin.left + margin.right)
+                .attr("height", height + margin.top + margin.bottom)
+                .append("g")
+                .attr("transform","translate(" + margin.left + "," + margin.top + ")");
+
+			    var myimageaug = svg_nn.append('image')
+			    .attr('xlink:href', file_name_aug)
+			    .attr("y",70)
+			    .attr("x",-20);
+
+			    var myimage1 = svg_nn.append('image')
+			    .attr('xlink:href', file_name_1)
+			    .attr("y",120)
+			    .attr("x",230);
+
+			    var myimage2 = svg_nn.append('image')
+			    .attr('xlink:href', file_name_2)
+			    .attr("y",140)
+			    .attr("x",355);
+
+			    var myimage3 = svg_nn.append('image')
+			    .attr('xlink:href', file_name_3)
+			    .attr("y",150)
+			    .attr("x",420);
+
+                var myimage4 = svg_nn.append('image')
+                .attr('xlink:href', file_name_4)
+                .attr("y",155)
+                .attr("x",455);
+
+                var myimage5 = svg_nn.append('image')
+                .attr('xlink:href', file_name_5)
+                .attr("y",158)
+                .attr("x",473);
+
+				var nn_label_img = svg_nn.append('image')
+		    	.attr('xlink:href', nn_label)
+		    	.attr('width',"500")
+		    	.attr("y",330)
+		    	.attr("x",-30);
+				}
+
+		};
+
+    //------------------------------------------mds plot-----------------------------------------
+
+    d3.json("/mds", function(error, data){
+      data_mds = data
+      plot_mds(data_mds, mds_index)
+	  });
+    //function to mds plot
+    function plot_mds(data, mds_index){
+			  var margin = {top: 20, right: 100, bottom: 50, left: 50},
+    		width = 420 - margin.left - margin.right,
+    		height = 380 - margin.top - margin.bottom;
+
+			  var svg_mds = d3.select("#mds_plot").append("svg")
+				.attr("width", width + margin.left + margin.right)
+    		.attr("height", height + margin.top + margin.bottom)
+  			.append("g")
+    		.attr("transform","translate(" + margin.left + "," + margin.top + ")");
+
+    		var x = d3.scaleLinear()
+    		.domain([d3.min(data['data'], function(d) { return +d[0] }), d3.max(data['data'], function(d) { return +d[0] })])
+    		.range([ 0, width ]);
+
+    		svg_mds.append("g")
+        .attr("class", "axisWhite")
+    		.attr("transform", "translate(0," + height + ")")
+    		.call(d3.axisBottom(x));
+
+  			var y = d3.scaleLinear()
+    		.domain([d3.min(data['data'], function(d) { return +d[1] }), d3.max(data['data'], function(d) { return +d[1] })])
+    		.range([ height, 0]);
+
+    		svg_mds.append("g")
+        .attr("class", "axisWhite")
+    		.call(d3.axisLeft(y));
+
+        svg_mds.append('g')
+        .selectAll("lines")
+        .data(data['edges'])
+        .enter()
+        .append("line")
+          .style("stroke", '#CBB7EE')
+          .style("stroke-width", function(d) {return 100*d[4]})
+          .attr("x1", function(d) {return x(d[0])})
+          .attr("y1", function(d) {return y(d[1])})
+          .attr("x2", function(d) {return x(d[2])})
+          .attr("y2", function(d) {return y(d[3])})
+          .on("mouseover", onMouseOver)
+          .on("mouseout", onMouseOut);
+
+
+        function onMouseOver(d, i) {
+          d3.select(this)
+          .transition()     
+          .duration(400)
+          .style("stroke", "gray")
+          .text(d[5]);
+
+          svg_mds.append("text")
+            .attr('class', 'val')
+            .attr("x", (x(d[0])+x(d[2]))/2)
+            .attr("y", (y(d[1])+y(d[3]))/2)
+            .text(d[4].toFixed(2))
+            .style("font-size", "10px")
+            .style("fill", "white")
+            .attr("alignment-baseline","middle");
+        }
+
+        function onMouseOut(d, i) {
+          d3.select(this)
+          .transition()     
+          .duration(400)
+          .style("stroke", '#CBB7EE')
+
+          d3.selectAll('.val')
+          .remove()
+        }
+
+
+    		svg_mds.append('g')
+    		.selectAll("dot")
+    		.data(data['data'])
+    		.enter()
+    		.append("circle")
+      		.attr("cx", function (d) { return x(d[0]); } )
+      		.attr("cy", function (d) { return y(d[1]); } )
+      		.attr("r", 10)
+      		.style("fill", function(d, i) {
+            if (i==mds_index){
+              return 'white'
+            }else{
+              c_return = colorReturn(i)
+              return c_return;
+            }
+          })
+          .on("mouseover", onMouseOver_node)
+          .on("mouseout", onMouseOut_node);
+
+          //mouse over mds nodes and corresponding interaction
+          function onMouseOver_node(d,i){
+            ind = i
+            summary_index.push(i)
+            m_ind = []
+            for (j=0; j<156; j++){
+              m_ind.push(ind*156+j)
+            }
+            send_index = []
+            mds_send_index=m_ind
+            d3.select("#tsne_ground").selectAll("svg").remove();
+            plot_tsne_ground(data_tsne, send_index, tsne_select_index,mds_send_index)
+            d3.select("#tsne_predict").selectAll("svg").remove();
+            plot_tsne_predict(data_tsne_predict, send_index, tsne_select_index, mds_send_index)
+            d3.select("#sum_tab").selectAll("*").remove();
+            plot_summary(data_summary, summary_index)
+          }
+          function onMouseOut_node(d,i){
+            reset_all()
+          }
+
+			  var label = ["Epithelium","Stroma","Tumor","Necrosis","Dysplasia"]
+      	svg_mds.append('g')
+    		.selectAll("text")
+    		.data(data['data'])
+    		.enter()
+    		.append("text")
+	    	.attr("x", function (d) { return x(d[0]); })
+	    	.attr("y", function (d) { return y(d[1])-10; })
+	    	.text(function(d, i) { return label[i]; })
+	    	.style("font-size", "12px")
+        .style("fill", "white")
+	    	.attr("alignment-baseline","middle");
+
+		};
+
+    //------------------------------pcp plot-------------------------------------------
+
+    d3.json('/pcp', function(error, data){
+      data_pcp = data
+      plot_pcp(data_pcp, pcp_send_index)
+	  });
+    //function to pcp plot
+    function plot_pcp(data, pcp_send_index){
+	    backed_data =data
+      for (i=0; i<backed_data['data'].length;i++){
+        backed_data['data'][i].push(i)
+      }
+      var margin = {top: 20, right: 0, bottom: 0, left: 0},
+      width = 800 - margin.left - margin.right,
+      height = 480 - margin.top - margin.bottom;
+
+      var svg_pcp = d3.select("#pcp")
+      .append("svg")
+      .attr("transform","translate(0,0)")
+        .attr("width", width + margin.left + margin.right)
+        .attr("height", height + margin.top + margin.bottom)
+      .append("g")
+        .attr("transform",
+            "translate(" + margin.left + "," + margin.top + ")");
+
+
+      var dragging = {}, background, foreground;
+      var mini_arr = {};
+      var maxi_arr = {};
+
+      dimensions = [0,1,2,3,4];
+
+      for (i in dimensions)
+      {
+        mini_arr[i] = d3.min(data['data'], function(d) { return +d[i] });
+        maxi_arr[i] = d3.max(data['data'], function(d) { return +d[i] });
+      }
+
+      var y = {}
+      for (i in dimensions) {
+        y[i] = d3.scaleLinear()
+        .domain([mini_arr[i],maxi_arr[i]])
+        .range([height, 0]);
+      }
+
+      var x = d3.scalePoint()
+      .range([0, width])
+      .padding(1)
+      .domain(dimensions);
+
+      function path(d) {
+        return d3.line()(dimensions.map(function(p) 
+          {
+            return [x(p), y[p](d[p])]; 
+          }));
+      }
+
+      background = svg_pcp.append("g")
+      .selectAll("myPath")
+      .data(data['data'])
+      .enter().append("path")
+      .attr("d",  path)
+      .style("fill", "none")
+      .style("stroke",'gray')
+      .style("opacity", 0.4);
+
+
+      foreground = svg_pcp.append("g")
+      .selectAll("myPath")
+      .data(data['data'])
+      .enter().append("path")
+      .attr("d",  path)
+      .style("fill", "none")
+      .style("stroke",function(d) {
+        if (!br){
+          return 'orange'
+        }else{
+          if (pcp_send_index.includes(d[5])){
+            return 'orange'
+          }else{
+            return 'grey'
+          }
+      }
+      })
+      .style("opacity",function(d) {
+        if (pcp_send_index.length == 0 && count_t == 1){
+                return 1
+              }else{
+                kxx = pcp_send_index.includes(d[5]);
+                if(kxx){
+                  return 1
+                }else{
+                  return 0.4;
+                }
+            }
+      });
+
+
+      var g = svg_pcp.selectAll(".dimension")
+      .data(dimensions)
+      .enter().append("g")
+        .attr("class", "dimension")
+        .attr("transform", function(d) { return "translate(" + x(d) + ")"; })
+        .call(d3.drag()
+      .subject(function(d) { return {x: x(d)}; })
+      .on("start", function(d) {
+        dragging[d] = x(d);
+        background.attr("visibility", "hidden");
+      })
+      .on("drag", function(d) {
+        dragging[d] = Math.min(width, Math.max(0, d3.event.x));
+        foreground.attr("d", path);
+        dimensions.sort(function(a, b) { return position(a) - position(b); });
+        x.domain(dimensions);
+        g.attr("transform", function(d) { return "translate(" + position(d) + ")"; })
+      })
+      .on("end", function(d) {
+        delete dragging[d];
+        transition(d3.select(this)).attr("transform", "translate(" + x(d) + ")");
+        transition(foreground).attr("d", path);
+        background
+            .attr("d", path)
+          .transition()
+            .delay(500)
+            .duration(0)
+            .attr("visibility", null);
+          }));
+
+      var labels = ['Epithelium', 'Stroma', 'Tumor', 'Necrosis', 'Dysplasia'];
+
+      g.append("g")
+      .attr("class", "axis")
+      .each(function(d) { d3.select(this).attr("class", "axisWhite").call(d3.axisLeft().scale(y[d])); })//---------------------------------------
+      .append("text")
+        .style("text-anchor", "middle")
+        .attr("y", -9)
+        .text(function(d) { return labels[d]; })
+        .style("fill", "white");
+
+
+      g.append("g")
+      .attr("class", "brush")
+      .each(function(d) {
+        d3.select(this).call(y[d].brush = d3.brush().extent([[y[d].range()[1],0],[30,y[d].range()[0]]]).on("start", brushstart).on("end", brush));
+      })
+      .selectAll("rect")
+      .attr("x", -8)
+      .attr("width", 16);
+
+      function position(d) {
+        var v = dragging[d];
+        return v == null ? x(d) : v;
+      }
+
+      function transition(g) {
+        return g.transition().duration(500);
+      }
+
+      var extent_values = {};
+
+      var keep_track = {};
+
+      for(var i=0; i<y.length; i++)
+      {
+        keep_track[i] = null;
+      }
+
+      for (i in dimensions)
+      {
+        extent_values[i] = [y[i](0), y[i](1)];
+      }
+
+
+      function brushstart() {
+          if (!brush_test){
+          foreground.style("stroke",function(d) {
+            return "orange"
+          })
+          .style("opacity",1);
+          brush_test = true;
+          }
+        d3.event.sourceEvent.stopPropagation();
+      }
+
+      function brush() {
+        
+        var selected_axis = d3.select(this.parentNode).attr("transform").substring(10,20);
+        selected_axis = parseInt(selected_axis);
+        check_axis(selected_axis, d3.event.selection);
+          var actives = dimensions.filter(function(p) { return keep_track[p] }),
+          extents = actives.map(function(p) { return extent_values[p];});
+
+          //----------------------selection of data range-------------------------
+          if (actives!=null){
+            var class_with_range = []
+            var temp = []
+            for (var i = 0; i < 156; i++) {
+              temp.push(i)
+            }
+            for (j in actives){
+              var p = [];
+              first_limit =y[actives[j]].invert(extent_values[actives[j]][0]);
+              second_limit =y[actives[j]].invert(extent_values[actives[j]][1]); 
+              g1={class:actives[j], lim_up: first_limit, lim_low: second_limit}
+              class_with_range.push(g1)
+
+              u = first_limit
+              l= second_limit
+              kk= actives[j]
+              var result = backed_data['data'].filter(d_0 => d_0[kk] >= l && d_0[kk] <=u);
+              if (result.length!=0){
+                p = result.map(function(value,index) { return value[5]; });
+              }
+              if(p!=null){
+                temp = p.filter(value => temp.includes(value));
+              }else{
+                temp = []
+              }
+              if (temp!=null){
+                tsne_select_index = []
+                send_index = temp;
+                id_old = 'pcp'
+                d3.select("#tsne_ground").selectAll("svg").remove();
+                plot_tsne_ground(data_tsne, send_index,tsne_select_index,mds_send_index)
+                d3.select("#tsne_predict").selectAll("svg").remove();
+                plot_tsne_predict(data_tsne_predict, send_index, tsne_select_index, mds_send_index)
+                send_index = []
+              }
+            }
+          }
+          foreground.style("display", function(d) {  
+            return actives.every(function(p, i) {
+                return extent_values[p][0] <= y[p](d[p]) && y[p](d[p]) <= extent_values[p][1];
+            }) ? null : "none";
+          });
+      }
+
+
+      function check_axis(a, sel)
+      {
+        for (i in dimensions)
+        {
+          if (parseInt(x(i))==a)
+          {
+            keep_track[i] = a;
+            extent_values[i] = [sel[0][1],sel[1][1]];
+          }
+        }
+      }
+
+    };
+
+
+    //-------------------adding summary table-------------------------
+    d3.json('/summary', function(error, data){
+      data_summary = data
+      plot_summary(data_summary, summary_index)
+	  });
+
+    //function for summary table
+    function plot_summary(data, summary_index){
+      names = [data.data[0][4], data.data[1][4], data.data[2][4], data.data[3][4], data.data[4][4]]
+
+      var margin = {top: 0, right: 0, bottom: 0, left: 0},
+      width = 300 - margin.left - margin.right,
+      height = 180 - margin.top - margin.bottom;
+
+
+      function tabulate(data, columns, column_name) {
+        var table = d3.select("#sum_tab").append("table").attr("style", "margin-top: 10px; margin-left: 20px;");
+        var thead = table.append("thead"), 
+        tbody = table.append("tbody");
+        
+        thead.append("tr")
+            .selectAll("th")
+            .data(columns)
+            .enter()
+            .append("th")
+                .text(function(column) { return column_name[column]; });
+
+        var rows = tbody.selectAll("tr")
+            .data(data)
+            .enter()
+            .append("tr")
+            .style("color",function(d) {
+              if (d[4] == names[summary_index[0]]){
+                return 'black'
+              }else{
+                return 'white'
+            }
+          })
+            .style("background-color",function(d) {
+              if (d[4] == names[summary_index[0]]){
+                summary_index = []
+                return 'white'
+              }else{
+
+              return 'Taupe'
+            }
+            });
+
+        var forma = d3.format(".2f");
+        var cells = rows.selectAll("td")
+            .data(function(row) {
+                return columns.map(function(column) {
+                    return {column: column, value: row[column]};
+                });
+            })
+            .enter()
+            .append("td")
+            .attr("style", "font-family: Courier")
+                .html(function(d) { return d.value; });
+        
+        return table;
+      }
+      column_name = ["Precision","Recall","F1 Score","Support"];
+      cols = [4,0,1,2,3];
+      var summaryTable = tabulate(data['data'],columns=cols, column_name=column_name);
+    };
+		</script>
+	
+	</body>
+</html>
